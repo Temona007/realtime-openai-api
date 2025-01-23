@@ -52,4 +52,4 @@ server.get("/token", async () => {
   });
 });
 
-await server.listen({ port: 10000 });
+await server.listen({ port: 4242 });
