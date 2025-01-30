@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import logo from "/assets/openai-logomark.svg";
 import EventLog from "./EventLog";
 import SessionControls from "./SessionControls";
 import ToolPanel from "./ToolPanel";
+
+const logo = 'https://www.pfotenpiloten.org/wp-content/uploads/2024/03/Logo-Pfotenpiloten-ohne-Text-1.webp';
 
 export default function App() {
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -107,6 +108,12 @@ export default function App() {
     sendClientEvent({ type: "response.create" });
   }
 
+  // call Google Places API
+  async function fetchPetFriendlyPlaces(query, location) {
+    const response = await fetch(`/places?query=${query}&location=${location}`);
+    return response.json();
+  }
+
   // Attach event listeners to the data channel when a new one is created
   useEffect(() => {
     if (dataChannel) {
@@ -128,13 +135,19 @@ export default function App() {
       <nav className="absolute top-0 left-0 right-0 h-16 flex items-center">
         <div className="flex items-center gap-4 w-full m-4 pb-2 border-0 border-b border-solid border-gray-200">
           <img style={{ width: "24px" }} src={logo} />
-          <h1>AI Voice Agent</h1>
+          <h1 className="text-lg font-bold">AI DogMap Voice Agent</h1>
         </div>
       </nav>
       <main className="absolute top-16 left-0 right-0 bottom-0">
         <section className="absolute top-0 left-0 right-[380px] bottom-0 flex">
           <section className="absolute top-0 left-0 right-0 bottom-32 px-4 overflow-y-auto">
-            <EventLog events={events} />
+            {/* <EventLog events={events} /> */}
+            <ToolPanel
+            sendClientEvent={sendClientEvent}
+            sendTextMessage={sendTextMessage}
+            events={events}
+            isSessionActive={isSessionActive}
+          />
           </section>
           <section className="absolute h-32 left-0 right-0 bottom-0 p-4">
             <SessionControls
@@ -148,12 +161,13 @@ export default function App() {
           </section>
         </section>
         <section className="absolute top-0 w-[380px] right-0 bottom-0 p-4 pt-0 overflow-y-auto">
-          <ToolPanel
+        <EventLog events={events} />
+          {/* <ToolPanel
             sendClientEvent={sendClientEvent}
             sendTextMessage={sendTextMessage}
             events={events}
             isSessionActive={isSessionActive}
-          />
+          /> */}
         </section>
       </main>
     </>
