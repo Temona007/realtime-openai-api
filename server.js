@@ -105,4 +105,7 @@ server.get("/token", async () => {
   });
 });
 
-await server.listen({ port: process.env.PORT || 4242 });
+await server.listen({ 
+  port: process.env.PORT || 4242, 
+  host: '0.0.0.0'  // Bind to all network interfaces
+});
