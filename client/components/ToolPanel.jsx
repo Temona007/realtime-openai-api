@@ -39,11 +39,11 @@ function PlacesOutput({ places }) {
         <div key={index} className="p-4 border rounded-md bg-gray-50">
           <h3 className="font-bold text-lg">{place.name} <img src="place.icon" alt="" /></h3>
           <p className="text-sm text-gray-700">{place.address}</p>
-          <p className="text-sm text-gray-500">
+          {/* <p className="text-sm text-gray-500">
             <b>
               {place.opening_hours?.open_now ? "OPEN" : "CLOSED"}
             </b>
-          </p>
+          </p> */}
           <p className="text-sm text-gray-500">Rating: {place.rating}</p>
         </div>
       ))}
