@@ -1,128 +1,109 @@
 import { useEffect, useState } from "react";
 
-const functionDescription = `
-Call this function when a user asks for a color palette.
-`;
+// Function to fetch places
+const fetchPlaces = async (query, location) => {
+  try {
+    const response = await fetch(`/places?query=${encodeURIComponent(query)}&location=${location}`);
+    const data = await response.json();
 
-const sessionUpdate = {
-  type: "session.update",
-  session: {
-    tools: [
-      {
-        type: "function",
-        name: "display_color_palette",
-        description: functionDescription,
-        parameters: {
-          type: "object",
-          strict: true,
-          properties: {
-            theme: {
-              type: "string",
-              description: "Description of the theme for the color scheme.",
-            },
-            colors: {
-              type: "array",
-              description: "Array of five hex color codes based on the theme.",
-              items: {
-                type: "string",
-                description: "Hex color code",
-              },
-            },
-          },
-          required: ["theme", "colors"],
-        },
-      },
-    ],
-    tool_choice: "auto",
-  },
+    if (response.ok) {
+      return data.places || [];
+    } else {
+      console.error("Error fetching places:", data.error);
+      return [];
+    }
+  } catch (error) {
+    console.error("Request failed:", error.message);
+    return [];
+  }
 };
 
-function FunctionCallOutput({ functionCallOutput }) {
-  const { theme, colors } = JSON.parse(functionCallOutput.arguments);
+async function fetchWithRetry(url, retries = 3, delay = 1000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await axios.get(url, { timeout: 5000 });
+      return response.data;
+    } catch (error) {
+      console.warn(`Attempt ${attempt} failed: ${error.message}`);
+      if (attempt === retries) throw error;
+      await new Promise((resolve) => setTimeout(resolve, delay * attempt));
+    }
+  }
+}
 
-  const colorBoxes = colors.map((color) => (
-    <div
-      key={color}
-      className="w-full h-16 rounded-md flex items-center justify-center border border-gray-200"
-      style={{ backgroundColor: color }}
-    >
-      <p className="text-sm font-bold text-black bg-slate-100 rounded-md p-2 border border-black">
-        {color}
-      </p>
-    </div>
-  ));
-
+// Component to display places
+function PlacesOutput({ places }) {
   return (
-    <div className="flex flex-col gap-2">
-      <p>Theme: {theme}</p>
-      {colorBoxes}
-      <pre className="text-xs bg-gray-100 rounded-md p-2 overflow-x-auto">
-        {JSON.stringify(functionCallOutput, null, 2)}
-      </pre>
+    <div className="flex flex-col gap-4">
+      {places.slice(0, 5).map((place, index) => ( // 10 pet friednly places
+        <div key={index} className="p-4 border rounded-md bg-gray-50">
+          <h3 className="font-bold text-lg">{place.name} <img src="place.icon" alt="" /></h3>
+          <p className="text-sm text-gray-700">{place.address}</p>
+          <p className="text-sm text-gray-500">
+            <b>
+              {place.opening_hours?.open_now ? "OPEN" : "CLOSED"}
+            </b>
+          </p>
+          <p className="text-sm text-gray-500">Rating: {place.rating}</p>
+        </div>
+      ))}
     </div>
   );
 }
 
-export default function ToolPanel({
-  isSessionActive,
-  sendClientEvent,
-  events,
-}) {
-  const [functionAdded, setFunctionAdded] = useState(false);
-  const [functionCallOutput, setFunctionCallOutput] = useState(null);
+export default function ToolPanel({ isSessionActive, sendClientEvent, events }) {
+  const [places, setPlaces] = useState([]);
 
   useEffect(() => {
     if (!events || events.length === 0) return;
 
-    const firstEvent = events[events.length - 1];
-    if (!functionAdded && firstEvent.type === "session.created") {
-      sendClientEvent(sessionUpdate);
-      setFunctionAdded(true);
-    }
+    const lastEvent = events[0]; // Get the latest event
 
-    const mostRecentEvent = events[0];
-    if (
-      mostRecentEvent.type === "response.done" &&
-      mostRecentEvent.response.output
-    ) {
-      mostRecentEvent.response.output.forEach((output) => {
-        if (
-          output.type === "function_call" &&
-          output.name === "display_color_palette"
-        ) {
-          setFunctionCallOutput(output);
-          setTimeout(() => {
-            sendClientEvent({
-              type: "response.create",
-              response: {
-                instructions: `
-                ask for feedback about the color palette - don't repeat 
-                the colors, just ask if they like the colors.
-              `,
+    if (lastEvent.type === "session.created") {
+      sendClientEvent({
+        type: "session.update",
+        session: {
+          tools: [
+            {
+              type: "function",
+              name: "search_places",
+              description: "Search for places near a specified location.",
+              parameters: {
+                type: "object",
+                properties: {
+                  query: { type: "string", description: "Type of place to search." },
+                  location: { type: "string", description: "Location to search around (latitude,longitude)." },
+                },
+                required: ["query", "location"],
               },
-            });
-          }, 500);
-        }
+            },
+          ],
+          tool_choice: "auto",
+        },
       });
     }
-  }, [events]);
 
-  useEffect(() => {
-    if (!isSessionActive) {
-      setFunctionAdded(false);
-      setFunctionCallOutput(null);
+    if (lastEvent.type === "response.done" && lastEvent.response?.output) {
+      const output = lastEvent.response.output.find(
+        (o) => o.type === "function_call" && o.name === "search_places"
+      );
+
+      if (output) {
+        const { query, location } = JSON.parse(output.arguments);
+        fetchPlaces(query, location).then(setPlaces);
+      }
     }
-  }, [isSessionActive]);
+  }, [events, sendClientEvent]);
 
   return (
     <section className="h-full w-full flex flex-col gap-4">
       <div className="h-full bg-gray-50 rounded-md p-4">
-        <h2 className="text-lg font-bold">Color Palette Tool</h2>
+        <h2 className="text-lg font-bold">Places Search Tool</h2>
         {isSessionActive ? (
-          functionCallOutput ? (
-            <FunctionCallOutput functionCallOutput={functionCallOutput} />
+          places.length > 0 ? (
+            <PlacesOutput places={places} />
           ) : (
-            <p>Ask for advice on a color palette...</p>
+            <p>Ask for a place to search...</p>
           )
         ) : (
           <p>Start the session to use this tool...</p>
