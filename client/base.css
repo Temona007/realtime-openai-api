@@ -22,3 +22,8 @@ body {
   font-size: 0.9rem;
   background-color: var(--color-base);
 }
+
+.ai-dogmap-activate-btn {
+  background-color: #00aab1 !important;
+  border-color: #00aab1 !important;
+}
