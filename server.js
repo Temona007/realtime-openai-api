@@ -65,37 +65,90 @@ server.get("/places", async (request, reply) => {
 
 
 // Server-side API route to return an ephemeral realtime session token
-server.get("/token", async () => {
-  const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini-realtime-preview-2024-12-17",
-      voice: "alloy",
-      instructions: "You are a helpful assistant that specializes in providing recommendations for pet-friendly places (5 places) based on user location (ask user), talk quickly.  Use information from www.pfotenpiloten.org,  www.assistancedogfoundation.org , www.stiftungassistenzhund.org, map-app.pfotenpiloten.org/up, and Google Places and from database json file (focus on this file show all data) to suggest nearby pet-friendly locations, including parks, cafes, hotels, and restaurants. Tailor your recommendations based on the user's location or provided details. Be concise, informative, and user-focused. Prioritize accuracy and relevance to the user's needs. Dosn't talk thing unrelated DogMap and pet friednly places",
-      temperature: 0.8,
+server.get("/token", async (request, reply) => {
+  try {
+    // Get user IP
+    let ip = request.headers["x-forwarded-for"] || request.ip;
 
-      // tools: [
-      //   {
-      //     type: "function",
-      //     name: "get_pet_friendly_locations",
-      //     description: "Find pet-friendly places using Google Places API.",
-      //     parameters: {
-      //       type: "object",
-      //       properties: {
-      //         query: { type: "string", description: "Type of place (e.g., pet-friendly cafes)" },
-      //         location: { type: "string", description: "User's location (latitude,longitude)" }
-      //       },
-      //       required: ["query", "location"]
-      //     }
-      //   }
-      // ]
+    // Use a default IP if running locally
+    if (ip === "127.0.0.1" || ip === "::1") {
+      ip = "91.242.199.131"; // Example IP address
+    }
 
-    }),
-  });
+    // Fetch user location
+    let location = "unknown location"; // Default value
+    const geoResponse = await fetch(`http://ip-api.com/json/${ip}?fields=status,lat,lon`);
+    const geoData = await geoResponse.json();
+
+    if (geoData.status === "success") {
+      // Geo data location
+      let geoDataLocation = `${geoData.lat},${geoData.lon}`;
+
+      // CITY, STREET location
+      const convertLocation = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${geoDataLocation}&key=${process.env.GOOGLE_PLACES_API_KEY}`
+      );
+      const dataLocation = await convertLocation.json(); 
+      const addressComponents = dataLocation.results[0]?.address_components || [];
+      const city =
+        addressComponents.find(c => c.types.includes("locality"))?.long_name ||
+        addressComponents.find(c => c.types.includes("administrative_area_level_1"))?.long_name ||
+        addressComponents.find(c => c.types.includes("political"))?.long_name ||
+        "Unknown City";
+    const street =
+        addressComponents.find(s => s.types.includes("route"))?.long_name ||
+        addressComponents.find(s => s.types.includes("intersection"))?.long_name ||
+        "Unknown Street";
+      location = `City: ${city}, Street: ${street}`;
+      console.log("User location:", location);
+    }
+
+    // Fetch PET-FRIENDLY places from Google Places API
+    //  5KM radius
+     const query = "pet-friendly places";
+     const placesUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&location=${geoData.lat},${geoData.lon}&radius=5000&key=${process.env.GOOGLE_PLACES_API_KEY}`;
+     const placesResponse = await fetch(placesUrl);
+     const placesData = await placesResponse.json();
+     if (placesData.status !== "OK") {
+       throw new Error(placesData.error_message || "Failed to fetch places");
+     }
+     // Extract 5 places
+     const places = placesData.results.slice(0, 5).map(place => ({
+       name: place.name,
+       address: place.formatted_address,
+       rating: place.rating || "N/A",
+     }));
+    console.log("Google Places API Response:", placesData.results);
+
+    // Fetch OpenAI token with updated instructions
+    const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-realtime-preview-2024-12-17",
+        voice: "shimmer",
+        instructions: `You are a helpful assistant that specializes in providing recommendations for pet-friendly places (5 places) based on user location.
+        The user's location is ${location}, 
+        if location = Unknown, ask user location. 
+        Based on Google Maps data, here are 5 recommended pet-friendly places:
+        ${places.map(p => `- ${p.name} (${p.address}, Rating: ${p.rating})`).join("\n")}.
+        Tailor your recommendations based on the user's location or provided details. 
+        Be concise, informative, and user-focused. 
+        Prioritize accuracy and relevance to the user's needs. 
+        Do not talk about anything unrelated to DogMap and pet-friendly places.`,
+        // Use Google Maps data to suggest nearby pet-friendly locations, including parks, cafes, hotels, and restaurants. 
+        temperature: 0.8,
+      }),
+    });
+
+    return reply.send(await r.json());
+  } catch (error) {
+    return reply.status(500).send({ error: "Error generating token" });
+  }
+});
 
   return new Response(r.body, {
     status: 200,
