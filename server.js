@@ -115,7 +115,8 @@ server.get("/track-location", async (request, reply) => {
 server.get("/token", async (request, reply) => {
   try {
     // Get user IP
-    let ip = request.headers["x-forwarded-for"] || request.ip;
+    // let ip = request.headers["x-forwarded-for"] || request.ip;
+    let ip = request.headers["x-forwarded-for"]?.split(',')[0] || request.socket.remoteAddress;
 
     // Use a default IP if running locally
     if (ip === "127.0.0.1" || ip === "::1") {
