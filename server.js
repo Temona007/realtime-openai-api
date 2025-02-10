@@ -41,8 +41,8 @@ server.get("/places", async (request, reply) => {
 
   // If no location provided, use IP-based geolocation
   if (!location) {
-    // const ip = request.headers["x-forwarded-for"] || request.ip;
-    let ip = request.headers["x-forwarded-for"] || request.ip;
+    // let ip = request.headers["x-forwarded-for"] || request.ip;
+    let ip = request.headers["x-forwarded-for"]?.split(',')[0] || request.socket.remoteAddress;
 
     // If running locally, use a default IP for testing (e.g., New York City)
     if (ip === "127.0.0.1" || ip === "::1") {
