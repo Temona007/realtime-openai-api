@@ -39,8 +39,29 @@ server.get("/places", async (request, reply) => {
     return reply.status(400).send({ error: "Missing query or location" });
   }
 
+  // If no location provided, use IP-based geolocation
+  if (!location) {
+    // const ip = request.headers["x-forwarded-for"] || request.ip;
+    let ip = request.headers["x-forwarded-for"] || request.ip;
+
+    // If running locally, use a default IP for testing (e.g., New York City)
+    if (ip === "127.0.0.1" || ip === "::1") {
+      ip = "91.242.199.131"; // Example IP address
+    }
+    const geoResponse = await fetch(`http://ip-api.com/json/${ip}?fields=lat,lon`);
+    const geoData = await geoResponse.json();
+
+    if (geoData.status === "success") {
+      location = `${geoData.lat},${geoData.lon}`;
+    } else {
+      return reply.status(500).send({ error: "Failed to retrieve location" });
+    }
+  }
+
   const API_KEY = process.env.GOOGLE_PLACES_API_KEY;
-  const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&location=${location}&radius=5000&key=${process.env.GOOGLE_PLACES_API_KEY}`;
+
+  // 3km Radius
+  const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&location=${location}&radius=3000&key=${process.env.GOOGLE_PLACES_API_KEY}`;
 
   try {
     const response = await fetch(url);
@@ -50,15 +71,42 @@ server.get("/places", async (request, reply) => {
       throw new Error(data.error_message || "Failed to fetch places");
     }
 
-    const places = data.results.map((place) => ({
+    // SHOW ONLY 5 PLACES
+    const places = data.results.slice(0, 5).map((place) => ({
       name: place.name,
       address: place.formatted_address,
       rating: place.rating || "N/A",
     }));
 
+    // console.log("Google Places API Response:", data.results);
+
     reply.send({ query, places });
   } catch (error) {
     reply.status(500).send({ error: error.message });
+  }
+});
+
+// Track Location Only
+server.get("/track-location", async (request, reply) => {
+  try {
+    // const ip = request.headers["x-forwarded-for"] || request.ip;
+    let ip = request.headers["x-forwarded-for"] || request.ip;
+
+    // If running locally, use a default IP for testing (e.g., New York City)
+    if (ip === "127.0.0.1" || ip === "::1") {
+      ip = "91.242.199.131"; // Example IP address
+    }
+
+    const geoResponse = await fetch(`http://ip-api.com/json/${ip}?fields=status,lat,lon`);
+    const geoData = await geoResponse.json();
+
+    if (geoData.status === "fail") {
+      return reply.status(500).send({ error: "Failed to retrieve location" });
+    }
+
+    return reply.send({ location: `${geoData.lat},${geoData.lon}` });
+  } catch (error) {
+    return reply.status(500).send({ error: "Error fetching location" });
   }
 });
 
