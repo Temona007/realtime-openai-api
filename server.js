@@ -9,6 +9,7 @@ const server = Fastify({
       target: "@fastify/one-line-logger",
     },
   },
+  trustProxy: true, // This trusts the 'X-Forwarded-For' header
 });
 
 const schema = {
