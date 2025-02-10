@@ -99,7 +99,8 @@ server.get("/token", async (request, reply) => {
         addressComponents.find(s => s.types.includes("intersection"))?.long_name ||
         "Unknown Street";
       location = `City: ${city}, Street: ${street}`;
-      console.log("User location:", location);
+      // console.log("User location:", location);
+      server.log.info(`User location: ${location}`);
     }
 
     // Fetch PET-FRIENDLY places from Google Places API
