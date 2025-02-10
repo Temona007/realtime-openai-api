@@ -56,8 +56,6 @@ server.get("/places", async (request, reply) => {
       rating: place.rating || "N/A",
     }));
 
-    console.log("Google Places API Response:", data.results);
-
     reply.send({ query, places });
   } catch (error) {
     reply.status(500).send({ error: error.message });
