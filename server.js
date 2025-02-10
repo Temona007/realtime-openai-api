@@ -117,7 +117,7 @@ server.get("/token", async (request, reply) => {
        address: place.formatted_address,
        rating: place.rating || "N/A",
      }));
-    console.log("Google Places API Response:", placesData.results);
+    // console.log("Google Places API Response:", placesData.results);
 
     // Fetch OpenAI token with updated instructions
     const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
