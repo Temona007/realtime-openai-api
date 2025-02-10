@@ -137,7 +137,7 @@ server.get("/token", async (request, reply) => {
         Tailor your recommendations based on the user's location or provided details. 
         Be concise, informative, and user-focused. 
         Prioritize accuracy and relevance to the user's needs. 
-        Do not talk about anything unrelated to DogMap and pet-friendly places.`,
+        Do not talk about anything unrelated to DogMap and pet-friendly places. First say HI, then proceed with instructions.`,
         // Use Google Maps data to suggest nearby pet-friendly locations, including parks, cafes, hotels, and restaurants. 
         temperature: 0.8,
       }),
